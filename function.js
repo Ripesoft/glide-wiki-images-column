@@ -58,15 +58,67 @@ window.function = async function (keyword, userName, userEmail) {
     
     const imageUrls = [];
     
-    // Add the main page image if available
+    // Add the main page image if available (need to fetch attribution for it too)
     if (page?.original?.source) {
-      imageUrls.push(page.original.source);
+      // Fetch attribution for the main image
+      const mainImageUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=imageinfo&format=json&iiprop=url|extmetadata&titles=File:${encodeURIComponent(page.original.source.split('/').pop())}&origin=*`;
+      
+      try {
+        const mainImgResponse = await fetch(mainImageUrl, {
+          headers: {
+            'User-Agent': `${userName} (${userEmail})`,
+            'Api-User-Agent': `${userName} (${userEmail})`
+          }
+        });
+        
+        if (mainImgResponse.ok) {
+          const mainImgData = await mainImgResponse.json();
+          const mainImgPages = mainImgData.query?.pages || {};
+          const mainImgPage = Object.values(mainImgPages)[0];
+          
+          if (mainImgPage?.imageinfo && mainImgPage.imageinfo[0]) {
+            const info = mainImgPage.imageinfo[0];
+            const extmetadata = info.extmetadata || {};
+            
+            imageUrls.push({
+              url: page.original.source,
+              attribution: extmetadata.Attribution?.value || extmetadata.Artist?.value || 'Unknown',
+              license: extmetadata.LicenseShortName?.value || extmetadata.License?.value || 'Unknown',
+              description: extmetadata.ImageDescription?.value || mainImgPage.title || ''
+            });
+          } else {
+            // Fallback if we can't get attribution
+            imageUrls.push({
+              url: page.original.source,
+              attribution: 'Unknown',
+              license: 'Unknown',
+              description: ''
+            });
+          }
+        } else {
+          // Fallback if request fails
+          imageUrls.push({
+            url: page.original.source,
+            attribution: 'Unknown',
+            license: 'Unknown',
+            description: ''
+          });
+        }
+      } catch (err) {
+        // Fallback on error
+        imageUrls.push({
+          url: page.original.source,
+          attribution: 'Unknown',
+          license: 'Unknown',
+          description: ''
+        });
+      }
     }
     
-    // If we have additional images, fetch their URLs
+    // If we have additional images, fetch their URLs and attribution
     if (page?.images && page.images.length > 0) {
       const imageNames = page.images.slice(0, 10).map(img => img.title);
-      const imageInfoUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=imageinfo&format=json&iiprop=url&titles=${encodeURIComponent(imageNames.join('|'))}&origin=*`;
+      const imageInfoUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=imageinfo&format=json&iiprop=url|extmetadata&titles=${encodeURIComponent(imageNames.join('|'))}&origin=*`;
       
       const imageResponse = await fetch(imageInfoUrl, {
         headers: {
@@ -81,7 +133,15 @@ window.function = async function (keyword, userName, userEmail) {
         
         Object.values(imagePages).forEach(imgPage => {
           if (imgPage.imageinfo && imgPage.imageinfo[0]?.url) {
-            imageUrls.push(imgPage.imageinfo[0].url);
+            const info = imgPage.imageinfo[0];
+            const extmetadata = info.extmetadata || {};
+            
+            imageUrls.push({
+              url: info.url,
+              attribution: extmetadata.Attribution?.value || extmetadata.Artist?.value || 'Unknown',
+              license: extmetadata.LicenseShortName?.value || extmetadata.License?.value || 'Unknown',
+              description: extmetadata.ImageDescription?.value || imgPage.title || ''
+            });
           }
         });
       }
