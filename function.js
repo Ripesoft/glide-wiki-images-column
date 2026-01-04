@@ -6,20 +6,18 @@ window.function = async function (keyword, userName, userEmail) {
     ? (keyword.value || keyword.toString()) 
     : String(keyword);
   
-  // Build the Wikipedia API URL to search for images
-  const searchUrl = new URL('https://en.wikipedia.org/w/api.php');
-  
-  // First, search for the page related to the keyword
-  searchUrl.searchParams.append('action', 'query');
-  searchUrl.searchParams.append('format', 'json');
-  searchUrl.searchParams.append('titles', searchTerm);
-  searchUrl.searchParams.append('prop', 'pageimages|images');
-  searchUrl.searchParams.append('pithumbsize', '300');
-  searchUrl.searchParams.append('origin', '*');
+  // Build the Wikipedia API URL with keyword directly in the URL
+  const url = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles=${encodeURIComponent(searchTerm)}&origin=*`;
   
   try {
-    // Fetch page info with images
-    const response = await fetch(searchUrl.toString());
+    // Fetch with user information in headers (Wikipedia API best practice)
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': `${userName} (${userEmail})`,
+        'Api-User-Agent': `${userName} (${userEmail})`
+      }
+    });
+    
     if (!response.ok) {
       throw new Error(`Wikipedia API error: ${response.status}`);
     }
