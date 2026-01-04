@@ -9,7 +9,17 @@ window.function = async function (keyword, userName, userEmail) {
   }
   
   // Ensure it's a string
-  searchTerm = String(searchTerm);
+  searchTerm = String(searchTerm).trim();
+  
+  // Verify that keyword is provided and not empty
+  if (!searchTerm || searchTerm === 'undefined' || searchTerm === 'null' || searchTerm === '[object Object]') {
+    return JSON.stringify({
+      error: 'Keyword is required and must not be empty',
+      keyword: '',
+      images: [],
+      imageCount: 0
+    });
+  }
   
   // Build the Wikipedia API URL to get page with images
   const url = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages|images&format=json&piprop=original&titles=${encodeURIComponent(searchTerm)}&origin=*`;
