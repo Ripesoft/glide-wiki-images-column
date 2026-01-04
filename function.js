@@ -24,8 +24,19 @@ window.function = async function (keyword, userName, userEmail) {
     
     const data = await response.json();
     
-    // Return the complete Wikipedia response as-is
-    return JSON.stringify(data);
+    // Extract the image URL from the Wikipedia response
+    const pages = data.query?.pages || {};
+    const page = Object.values(pages)[0];
+    const imageUrl = page?.original?.source || null;
+    
+    // Return a clean JSON structure with the image URL properly escaped
+    return JSON.stringify({
+      keyword: searchTerm,
+      imageUrl: imageUrl,
+      pageId: page?.pageid || null,
+      title: page?.title || null,
+      rawResponse: data
+    }, null, 2);
   } catch (error) {
     throw new Error(`Failed to fetch Wikipedia images: ${error.message}`);
   }
