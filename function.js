@@ -20,61 +20,9 @@ window.function = async function (keyword, userName, userEmail) {
     }
     
     const data = await response.json();
-    const pages = data.query.pages;
-    const page = Object.values(pages)[0];
     
-    // Extract image information
-    const images = [];
-    
-    if (page.thumbnail) {
-      images.push({
-        title: page.title,
-        url: page.thumbnail.source,
-        width: page.thumbnail.width,
-        height: page.thumbnail.height
-      });
-    }
-    
-    if (page.images) {
-      // Fetch details of images to get their URLs
-      const imageNames = page.images.slice(0, 10).map(img => img.title);
-      
-      if (imageNames.length > 0) {
-        const imageInfoUrl = new URL('https://en.wikipedia.org/w/api.php');
-        imageInfoUrl.searchParams.append('action', 'query');
-        imageInfoUrl.searchParams.append('format', 'json');
-        imageInfoUrl.searchParams.append('titles', imageNames.join('|'));
-        imageInfoUrl.searchParams.append('prop', 'imageinfo');
-        imageInfoUrl.searchParams.append('iiprop', 'url|size');
-        imageInfoUrl.searchParams.append('origin', '*');
-        
-        const imageResponse = await fetch(imageInfoUrl.toString());
-        if (imageResponse.ok) {
-          const imageData = await imageResponse.json();
-          const imagePages = imageData.query.pages;
-          
-          Object.values(imagePages).forEach(imgPage => {
-            if (imgPage.imageinfo) {
-              imgPage.imageinfo.forEach(info => {
-                images.push({
-                  title: imgPage.title,
-                  url: info.url,
-                  width: info.width,
-                  height: info.height
-                });
-              });
-            }
-          });
-        }
-      }
-    }
-    
-    return JSON.stringify({
-      keyword: keyword,
-      imageCount: images.length,
-      images: images,
-      userAgent: `${userName} (${userEmail})`
-    });
+    // Return the complete Wikipedia response as-is
+    return JSON.stringify(data);
   } catch (error) {
     throw new Error(`Failed to fetch Wikipedia images: ${error.message}`);
   }
