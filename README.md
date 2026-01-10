@@ -8,8 +8,10 @@ This custom column integrates with Wikipedia's MediaWiki API to retrieve images 
 
 ## Features
 
-- **Keyword-based Search**: Search Wikipedia for articles matching your keyword
-- **Image Extraction**: Automatically extracts the main page image and up to 10 related images
+- **Smart Search**: Uses fuzzy search to find articles even with case-insensitive or approximate keywords (e.g., "hamster" finds "Hamster")
+- **Quality Image Filtering**: Automatically filters out SVG icons, logos, and UI elements to return only real photos
+- **Wikimedia Commons Integration**: Searches both Wikipedia and Wikimedia Commons for the best quality images
+- **Main Image Priority**: Always extracts the article's main featured image first
 - **Rich Metadata**: Returns image URLs, attribution, license information, and descriptions
 - **Wikipedia Compliance**: Includes user agent information (developer name and email) as required by Wikipedia's API policy
 - **Comprehensive Error Handling**: Graceful error handling with descriptive messages
@@ -67,11 +69,12 @@ The function returns a JSON string with the following structure:
 ## How It Works
 
 1. **Keyword Processing**: Intelligently extracts and validates the keyword from various input formats
-2. **Initial Search**: Sends a query to Wikipedia's API to find the article matching the keyword
-3. **Main Image Extraction**: Retrieves the article's main/original image with full attribution
-4. **Related Images Discovery**: Identifies up to 10 additional images from the article
-5. **Metadata Retrieval**: Fetches detailed attribution, licensing, and description for each image
-6. **Response Compilation**: Returns all images with complete metadata in a structured JSON format
+2. **Smart Search**: Performs a fuzzy search on Wikipedia to find the best matching article (handles case variations and close matches)
+3. **Main Image Extraction**: Retrieves the article's main/featured image with full attribution
+4. **Commons Search**: Searches Wikimedia Commons for additional high-quality images related to the keyword
+5. **Quality Filtering**: Automatically filters out SVG icons, logos, buttons, and UI elements - returns only actual photos (JPG, PNG, GIF)
+6. **Metadata Retrieval**: Fetches detailed attribution, licensing, and description for each image
+7. **Response Compilation**: Returns all images with complete metadata in a structured JSON format
 
 ## Usage in Glide
 
@@ -158,20 +161,24 @@ All errors are returned in the JSON response with an `error` field containing a 
 The `window.function` async function handles:
 1. **Smart Keyword Parsing**: Extracts keywords from various input formats (objects or strings)
 2. **Input Validation**: Ensures keywords are valid and not empty
-3. **API Request Construction**: Builds Wikipedia API URLs with proper query parameters
+3. **Fuzzy Search**: Searches Wikipedia to find the best matching article (handles "hamster" → "Hamster")
 4. **Main Image Fetching**: Retrieves the primary page image with full metadata
-5. **Related Images Discovery**: Fetches up to 10 additional article images
-6. **Attribution Retrieval**: Extracts detailed metadata including attribution, license, and descriptions
-7. **Error Handling**: Provides fallback values and comprehensive error messages
-8. **Response Formatting**: Returns structured JSON with all image data
+5. **Commons Integration**: Searches Wikimedia Commons for additional quality images
+6. **Quality Filtering**: Excludes SVG icons, logos, and UI elements - returns only photos (JPG/PNG/GIF)
+7. **Attribution Retrieval**: Extracts detailed metadata including attribution, license, and descriptions
+8. **Error Handling**: Provides fallback values and comprehensive error messages
+9. **Response Formatting**: Returns structured JSON with all image data
 
 ## Notes
 
-- The main page image is fetched first with complete attribution data
-- Additional related images are limited to 10 for performance
+- Uses fuzzy search to match keywords even with case differences (e.g., "hamster" matches "Hamster" article)
+- The main Wikipedia page image is fetched first with complete attribution data
+- Additional quality images are sourced from Wikimedia Commons (limited to 5 for performance)
+- Automatically filters out SVG icons, logos, buttons, and website UI elements
+- Only returns actual photos in JPG, PNG, or GIF format for better quality results
 - Attribution and description fields may contain HTML markup from Wikipedia
-- Image availability depends on the Wikipedia article content
-- Some keywords may return no images if no related article exists or the page lacks images
+- Image availability depends on Wikipedia article content and Wikimedia Commons
+- Some keywords may return fewer images if limited quality photos are available
 - Always provide valid developer credentials (name and email) to comply with Wikipedia's API policy
-- The function uses CORS-enabled Wikipedia endpoints for client-side requests
+- The function uses CORS-enabled Wikipedia and Commons endpoints for client-side requests
 - License information follows Creative Commons and other standard formats (CC BY, CC BY-SA, PD, etc.)
