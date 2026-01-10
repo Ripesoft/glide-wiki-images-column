@@ -42,8 +42,41 @@ function calculateSimilarity(str1, str2) {
 
 // Try to translate or find English equivalent
 async function findBestMatch(searchTerm, userName, userEmail) {
+  // Step 0: Try auto-translation to English first
+  let translatedTerm = null;
+  
+  try {
+    // Use MyMemory Translation API (free, no API key needed)
+    const translateUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(searchTerm)}&langpair=auto|en`;
+    
+    const translateResponse = await fetch(translateUrl);
+    
+    if (translateResponse.ok) {
+      const translateData = await translateResponse.json();
+      
+      // Check if translation was successful and different from original
+      if (translateData.responseStatus === 200 && translateData.responseData?.translatedText) {
+        const translated = translateData.responseData.translatedText.trim();
+        
+        // Only use translation if it's different from original
+        // and the match score indicates it wasn't already English
+        if (translated && 
+            translated.toLowerCase() !== searchTerm.toLowerCase() &&
+            translateData.responseData.match < 0.99) {
+          translatedTerm = translated;
+          console.log(`Auto-translated "${searchTerm}" to "${translatedTerm}"`);
+        }
+      }
+    }
+  } catch (translateError) {
+    // If translation fails, continue without it
+    console.log('Translation API unavailable, using original term:', translateError);
+  }
+  
   // Step 1: Try direct Wikipedia search with multiple strategies
   const searches = [
+    // If we have a translation, prioritize it
+    ...(translatedTerm ? [translatedTerm] : []),
     // Direct search
     searchTerm,
     // Try with quotes for exact phrase
@@ -290,7 +323,8 @@ window.function = async function (keyword, userName, userEmail) {
     });
     
     // Additionally, search Wikimedia Commons for related images
-    const commonsSearchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srnamespace=6&srsearch=${encodeURIComponent(searchTerm)}&format=json&srlimit=10&origin=*`;
+    // Use pageTitle (which is already in English) for better Commons results
+    const commonsSearchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srnamespace=6&srsearch=${encodeURIComponent(pageTitle)}&format=json&srlimit=10&origin=*`;
     
     try {
       const commonsResponse = await fetch(commonsSearchUrl, {
