@@ -165,7 +165,10 @@
                     statusDiv.innerHTML = `
                         <p class="success">✅ Success!</p>
                         <p><strong>Original Keyword:</strong> ${data.keyword}</p>
+                        ${data.queriedKeywords?.translated ? `<p><strong>Translated To:</strong> ${data.queriedKeywords.translated}</p>` : ''}
+                        ${data.queriedKeywords?.searchTermsUsed ? `<p><strong>Search Terms Used:</strong> ${data.queriedKeywords.searchTermsUsed.join(', ')}</p>` : ''}
                         <p><strong>Wikipedia Page:</strong> ${data.pageTitle}</p>
+                        <p><strong>Relevance Score:</strong> ${data.relevanceScore || 'N/A'}</p>
                         <p><strong>Images Found:</strong> ${data.imageCount}</p>
                     `;
 

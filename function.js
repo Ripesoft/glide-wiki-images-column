@@ -177,7 +177,11 @@ async function findBestMatch(searchTerm, userName, userEmail) {
   // Sort by relevance score
   uniqueResults.sort((a, b) => b.relevanceScore - a.relevanceScore);
   
-  return uniqueResults;
+  return {
+    results: uniqueResults,
+    translatedTerm: translatedTerm,
+    searchTermsUsed: searches
+  };
 }
 
 window.function = async function (keyword, userName, userEmail) {
@@ -203,19 +207,24 @@ window.function = async function (keyword, userName, userEmail) {
   
   try {
     // Step 1: Use improved search with fuzzy matching and translation support
-    const searchResults = await findBestMatch(searchTerm, userName, userEmail);
+    const searchData = await findBestMatch(searchTerm, userName, userEmail);
     
     // Get the best match from search results
-    if (!searchResults || searchResults.length === 0) {
+    if (!searchData.results || searchData.results.length === 0) {
       return JSON.stringify({
         error: `No Wikipedia articles found for keyword: ${searchTerm}`,
         keyword: searchTerm,
+        queriedKeywords: {
+          original: searchTerm,
+          translated: searchData.translatedTerm,
+          searchTermsUsed: searchData.searchTermsUsed
+        },
         images: []
       });
     }
     
-    const pageTitle = searchResults[0].title;
-    const relevanceScore = searchResults[0].relevanceScore;
+    const pageTitle = searchData.results[0].title;
+    const relevanceScore = searchData.results[0].relevanceScore;
     
     // Step 2: Fetch page with main image only (using pageimages)
     const url = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles=${encodeURIComponent(pageTitle)}&origin=*`;
@@ -246,6 +255,11 @@ window.function = async function (keyword, userName, userEmail) {
       return JSON.stringify({
         error: `Page not found for keyword: ${searchTerm}`,
         keyword: searchTerm,
+        queriedKeywords: {
+          original: searchTerm,
+          translated: searchData.translatedTerm,
+          searchTermsUsed: searchData.searchTermsUsed
+        },
         images: []
       });
     }
@@ -390,9 +404,14 @@ window.function = async function (keyword, userName, userEmail) {
     // Return array of image URLs with metadata
     return JSON.stringify({
       keyword: searchTerm,
+      queriedKeywords: {
+        original: searchTerm,
+        translated: searchData.translatedTerm,
+        searchTermsUsed: searchData.searchTermsUsed
+      },
       pageTitle: pageTitle,
       relevanceScore: Math.round(relevanceScore * 100) / 100,
-      alternativeMatches: searchResults.slice(1, 4).map(r => ({
+      alternativeMatches: searchData.results.slice(1, 4).map(r => ({
         title: r.title,
         score: Math.round(r.relevanceScore * 100) / 100
       })),

@@ -42,6 +42,11 @@ The function returns a JSON string with the following structure:
 ```json
 {
   "keyword": "Aardvark",
+  "queriedKeywords": {
+    "original": "Aardvark",
+    "translated": null,
+    "searchTermsUsed": ["Aardvark", "\"Aardvark\"", "Aardvark"]
+  },
   "pageTitle": "Aardvark",
   "images": [
     {
@@ -59,7 +64,13 @@ The function returns a JSON string with the following structure:
 ### Response Fields
 
 - **keyword**: The search term used for the query
+- **queriedKeywords**: Debug information showing how the search was performed:
+  - **original**: The original keyword provided
+  - **translated**: The auto-translated English term (null if no translation occurred)
+  - **searchTermsUsed**: Array of all search variations attempted
 - **pageTitle**: The actual Wikipedia page title found
+- **relevanceScore**: Confidence score for the match (0-1)
+- **alternativeMatches**: Other potential matches found
 - **images**: Array of image objects, each containing:
   - **url**: Direct URL to the image file
   - **attribution**: Creator or source attribution (may include HTML)
