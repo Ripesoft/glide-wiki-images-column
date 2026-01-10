@@ -42,71 +42,8 @@ function calculateSimilarity(str1, str2) {
 
 // Try to translate or find English equivalent
 async function findBestMatch(searchTerm, userName, userEmail) {
-  // Step 0: Try auto-translation to English first with multiple methods
-  let translatedTerm = null;
-  let translationMethod = null;
-  
-  // Method 1: Try MyMemory Translation API
-  try {
-    const translateUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(searchTerm)}&langpair=auto|en`;
-    
-    const translateResponse = await fetch(translateUrl);
-    
-    if (translateResponse.ok) {
-      const translateData = await translateResponse.json();
-      
-      // Check if translation was successful and different from original
-      if (translateData.responseStatus === 200 && translateData.responseData?.translatedText) {
-        const translated = translateData.responseData.translatedText.trim();
-        
-        // Use translation if it's different from original (more lenient check)
-        if (translated && 
-            translated.toLowerCase() !== searchTerm.toLowerCase()) {
-          translatedTerm = translated;
-          translationMethod = 'MyMemory API';
-          console.log(`Auto-translated "${searchTerm}" to "${translatedTerm}" (confidence: ${translateData.responseData.match})`);
-        }
-      }
-    }
-  } catch (translateError) {
-    console.log('MyMemory Translation API unavailable:', translateError.message);
-  }
-  
-  // Method 2: If no translation yet, try LibreTranslate (free, open source)
-  if (!translatedTerm) {
-    try {
-      const libreUrl = `https://libretranslate.com/translate`;
-      const libreResponse = await fetch(libreUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          q: searchTerm,
-          source: 'auto',
-          target: 'en',
-          format: 'text'
-        })
-      });
-      
-      if (libreResponse.ok) {
-        const libreData = await libreResponse.json();
-        if (libreData.translatedText && 
-            libreData.translatedText.toLowerCase() !== searchTerm.toLowerCase()) {
-          translatedTerm = libreData.translatedText.trim();
-          translationMethod = 'LibreTranslate';
-          console.log(`Auto-translated "${searchTerm}" to "${translatedTerm}" via LibreTranslate`);
-        }
-      }
-    } catch (libreError) {
-      console.log('LibreTranslate unavailable:', libreError.message);
-    }
-  }
-  
   // Step 1: Try direct Wikipedia search with multiple strategies
   const searches = [
-    // If we have a translation, prioritize it
-    ...(translatedTerm ? [translatedTerm] : []),
     // Direct search
     searchTerm,
     // Try with quotes for exact phrase
@@ -207,12 +144,7 @@ async function findBestMatch(searchTerm, userName, userEmail) {
   // Sort by relevance score
   uniqueResults.sort((a, b) => b.relevanceScore - a.relevanceScore);
   
-  return {
-    results: uniqueResults,
-    translatedTerm: translatedTerm,
-    translationMethod: translationMethod,
-    searchTermsUsed: searches
-  };
+  return uniqueResults;
 }
 
 window.function = async function (keyword, userName, userEmail) {
@@ -238,25 +170,19 @@ window.function = async function (keyword, userName, userEmail) {
   
   try {
     // Step 1: Use improved search with fuzzy matching and translation support
-    const searchData = await findBestMatch(searchTerm, userName, userEmail);
+    const searchResults = await findBestMatch(searchTerm, userName, userEmail);
     
     // Get the best match from search results
-    if (!searchData.results || searchData.results.length === 0) {
+    if (!searchResults || searchResults.length === 0) {
       return JSON.stringify({
         error: `No Wikipedia articles found for keyword: ${searchTerm}`,
         keyword: searchTerm,
-        queriedKeywords: {
-          original: searchTerm,
-          translated: searchData.translatedTerm,
-          translationMethod: searchData.translationMethod,
-          searchTermsUsed: searchData.searchTermsUsed
-        },
         images: []
       });
     }
     
-    const pageTitle = searchData.results[0].title;
-    const relevanceScore = searchData.results[0].relevanceScore;
+    const pageTitle = searchResults[0].title;
+    const relevanceScore = searchResults[0].relevanceScore;
     
     // Step 2: Fetch page with main image only (using pageimages)
     const url = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles=${encodeURIComponent(pageTitle)}&origin=*`;
@@ -287,12 +213,6 @@ window.function = async function (keyword, userName, userEmail) {
       return JSON.stringify({
         error: `Page not found for keyword: ${searchTerm}`,
         keyword: searchTerm,
-        queriedKeywords: {
-          original: searchTerm,
-          translated: searchData.translatedTerm,
-          translationMethod: searchData.translationMethod,
-          searchTermsUsed: searchData.searchTermsUsed
-        },
         images: []
       });
     }
@@ -370,8 +290,7 @@ window.function = async function (keyword, userName, userEmail) {
     });
     
     // Additionally, search Wikimedia Commons for related images
-    // Use pageTitle (which is already in English) for better Commons results
-    const commonsSearchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srnamespace=6&srsearch=${encodeURIComponent(pageTitle)}&format=json&srlimit=10&origin=*`;
+    const commonsSearchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srnamespace=6&srsearch=${encodeURIComponent(searchTerm)}&format=json&srlimit=10&origin=*`;
     
     try {
       const commonsResponse = await fetch(commonsSearchUrl, {
@@ -437,15 +356,9 @@ window.function = async function (keyword, userName, userEmail) {
     // Return array of image URLs with metadata
     return JSON.stringify({
       keyword: searchTerm,
-      queriedKeywords: {
-        original: searchTerm,
-        translated: searchData.translatedTerm,
-        translationMethod: searchData.translationMethod,
-        searchTermsUsed: searchData.searchTermsUsed
-      },
       pageTitle: pageTitle,
       relevanceScore: Math.round(relevanceScore * 100) / 100,
-      alternativeMatches: searchData.results.slice(1, 4).map(r => ({
+      alternativeMatches: searchResults.slice(1, 4).map(r => ({
         title: r.title,
         score: Math.round(r.relevanceScore * 100) / 100
       })),

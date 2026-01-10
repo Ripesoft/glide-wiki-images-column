@@ -8,9 +8,6 @@ This custom column integrates with Wikipedia's MediaWiki API to retrieve images 
 
 ## Features
 
-- **Dual Translation APIs**: Uses MyMemory Translation API as primary and LibreTranslate as fallback for maximum translation success
-- **Auto-Translation**: Automatically translates non-English keywords to English for better Wikipedia search results
-- **Multi-Language Support**: Search in any language (e.g., "Hund" in German → "Dog", "Chien" in French → "Dog")
 - **Smart Search**: Uses fuzzy search to find articles even with case-insensitive or approximate keywords (e.g., "hamster" finds "Hamster")
 - **Quality Image Filtering**: Automatically filters out SVG icons, logos, and UI elements to return only real photos
 - **Wikimedia Commons Integration**: Searches both Wikipedia and Wikimedia Commons for the best quality images
@@ -43,11 +40,6 @@ The function returns a JSON string with the following structure:
 ```json
 {
   "keyword": "Aardvark",
-  "queriedKeywords": {
-    "original": "Aardvark",
-    "translated": null,
-    "searchTermsUsed": ["Aardvark", "\"Aardvark\"", "Aardvark"]
-  },
   "pageTitle": "Aardvark",
   "images": [
     {
@@ -65,14 +57,7 @@ The function returns a JSON string with the following structure:
 ### Response Fields
 
 - **keyword**: The search term used for the query
-- **queriedKeywords**: Debug information showing how the search was performed:
-  - **original**: The original keyword provided
-  - **translated**: The auto-translated English term (null if no translation occurred)
-  - **translationMethod**: Which API was used for translation (MyMemory API or LibreTranslate)
-  - **searchTermsUsed**: Array of all search variations attempted
 - **pageTitle**: The actual Wikipedia page title found
-- **relevanceScore**: Confidence score for the match (0-1)
-- **alternativeMatches**: Other potential matches found
 - **images**: Array of image objects, each containing:
   - **url**: Direct URL to the image file
   - **attribution**: Creator or source attribution (may include HTML)
@@ -84,17 +69,12 @@ The function returns a JSON string with the following structure:
 ## How It Works
 
 1. **Keyword Processing**: Intelligently extracts and validates the keyword from various input formats
-2. **Dual Translation System**: 
-   - First tries MyMemory Translation API (more lenient matching)
-   - Falls back to LibreTranslate if MyMemory is unavailable
-   - Only uses translation if result differs from original term
-3. **Smart Search**: Performs fuzzy search on Wikipedia to find the best matching article (handles case variations, translations, and close matches)
-4. **Wikidata Integration**: Uses Wikidata to find English equivalents for foreign language terms
-5. **Main Image Extraction**: Retrieves the article's main/featured image with full attribution
-6. **Commons Search**: Searches Wikimedia Commons for additional high-quality images using the English page title
-7. **Quality Filtering**: Automatically filters out SVG icons, logos, buttons, and UI elements - returns only actual photos (JPG, PNG, GIF)
-8. **Metadata Retrieval**: Fetches detailed attribution, licensing, and description for each image
-9. **Response Compilation**: Returns all images with complete metadata in a structured JSON format
+2. **Smart Search**: Performs a fuzzy search on Wikipedia to find the best matching article (handles case variations and close matches)
+3. **Main Image Extraction**: Retrieves the article's main/featured image with full attribution
+4. **Commons Search**: Searches Wikimedia Commons for additional high-quality images related to the keyword
+5. **Quality Filtering**: Automatically filters out SVG icons, logos, buttons, and UI elements - returns only actual photos (JPG, PNG, GIF)
+6. **Metadata Retrieval**: Fetches detailed attribution, licensing, and description for each image
+7. **Response Compilation**: Returns all images with complete metadata in a structured JSON format
 
 ## Usage in Glide
 
@@ -107,27 +87,17 @@ The function returns a JSON string with the following structure:
 ### Example Usage
 
 ```
-keyword = "Aardvark"  (or "Ameisenbär" in German, "Oryctérope" in French)
+keyword = "Aardvark"
 userName = "Your Name"
 userEmail = "your@email.com"
 
 → Returns JSON with:
-  - keyword: "Aardvark" (original or translated)
+  - keyword: "Aardvark"
   - pageTitle: "Aardvark"
-  - Multiple images with URLs, attribution, licenses, and descriptions
-  - imageCount: varies
+  - 11 images with URLs, attribution, licenses, and descriptions
+  - imageCount: 11
   - error: null
 ```
-
-### Multi-Language Examples
-
-The column automatically translates keywords to English:
-
-- **German**: `"Hund"` → searches for "Dog"
-- **French**: `"Chien"` → searches for "Dog"  
-- **Spanish**: `"Perro"` → searches for "Dog"
-- **Polish**: `"Chomik"` → searches for "Hamster"
-- **Japanese**: `"猫"` → searches for "Cat"
 
 ### Example Response
 
@@ -191,32 +161,24 @@ All errors are returned in the JSON response with an `error` field containing a 
 The `window.function` async function handles:
 1. **Smart Keyword Parsing**: Extracts keywords from various input formats (objects or strings)
 2. **Input Validation**: Ensures keywords are valid and not empty
-3. **Auto-Translation**: Translates non-English keywords to English using MyMemory Translation API
-4. **Fuzzy Search**: Searches Wikipedia to find the best matching article (handles case variations and translations)
-5. **Wikidata Lookup**: Uses Wikidata to find English equivalents for foreign terms
-6. **Main Image Fetching**: Retrieves the primary page image with full metadata
-7. **Commons Integration**: Searches Wikimedia Commons for additional quality images using the English page title
-8. **Quality Filtering**: Excludes SVG icons, logos, and UI elements - returns only photos (JPG/PNG/GIF)
-9. **Attribution Retrieval**: Extracts detailed metadata including attribution, license, and descriptions
-10. **Error Handling**: Provides fallback values and comprehensive error messages
-11. **Response Formatting**: Returns structured JSON with all image data
+3. **Fuzzy Search**: Searches Wikipedia to find the best matching article (handles "hamster" → "Hamster")
+4. **Main Image Fetching**: Retrieves the primary page image with full metadata
+5. **Commons Integration**: Searches Wikimedia Commons for additional quality images
+6. **Quality Filtering**: Excludes SVG icons, logos, and UI elements - returns only photos (JPG/PNG/GIF)
+7. **Attribution Retrieval**: Extracts detailed metadata including attribution, license, and descriptions
+8. **Error Handling**: Provides fallback values and comprehensive error messages
+9. **Response Formatting**: Returns structured JSON with all image data
 
 ## Notes
 
-- **Dual Translation System**: Uses two translation APIs for maximum reliability:
-  - Primary: MyMemory Translation API (free, no API key)
-  - Fallback: LibreTranslate (open source, free)
-- **Auto-Translation**: Keywords in any language are automatically translated to English for better Wikipedia search results
-- **Improved Success Rate**: Removed overly strict translation matching - now accepts all valid translations
-- Uses fuzzy search and Wikidata to match keywords even with case differences (e.g., "hamster" matches "Hamster" article)
+- Uses fuzzy search to match keywords even with case differences (e.g., "hamster" matches "Hamster" article)
 - The main Wikipedia page image is fetched first with complete attribution data
-- Additional quality images are sourced from Wikimedia Commons using the English page title (limited to 5 for performance)
+- Additional quality images are sourced from Wikimedia Commons (limited to 5 for performance)
 - Automatically filters out SVG icons, logos, buttons, and website UI elements
 - Only returns actual photos in JPG, PNG, or GIF format for better quality results
 - Attribution and description fields may contain HTML markup from Wikipedia
 - Image availability depends on Wikipedia article content and Wikimedia Commons
 - Some keywords may return fewer images if limited quality photos are available
 - Always provide valid developer credentials (name and email) to comply with Wikipedia's API policy
-- The function uses CORS-enabled Wikipedia, Commons, and translation endpoints for client-side requests
+- The function uses CORS-enabled Wikipedia and Commons endpoints for client-side requests
 - License information follows Creative Commons and other standard formats (CC BY, CC BY-SA, PD, etc.)
-- If both translation APIs are unavailable, the system falls back to using the original keyword
