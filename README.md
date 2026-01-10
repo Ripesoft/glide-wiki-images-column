@@ -8,6 +8,7 @@ This custom column integrates with Wikipedia's MediaWiki API to retrieve images 
 
 ## Features
 
+- **Dual Translation APIs**: Uses MyMemory Translation API as primary and LibreTranslate as fallback for maximum translation success
 - **Auto-Translation**: Automatically translates non-English keywords to English for better Wikipedia search results
 - **Multi-Language Support**: Search in any language (e.g., "Hund" in German → "Dog", "Chien" in French → "Dog")
 - **Smart Search**: Uses fuzzy search to find articles even with case-insensitive or approximate keywords (e.g., "hamster" finds "Hamster")
@@ -67,6 +68,7 @@ The function returns a JSON string with the following structure:
 - **queriedKeywords**: Debug information showing how the search was performed:
   - **original**: The original keyword provided
   - **translated**: The auto-translated English term (null if no translation occurred)
+  - **translationMethod**: Which API was used for translation (MyMemory API or LibreTranslate)
   - **searchTermsUsed**: Array of all search variations attempted
 - **pageTitle**: The actual Wikipedia page title found
 - **relevanceScore**: Confidence score for the match (0-1)
@@ -82,7 +84,10 @@ The function returns a JSON string with the following structure:
 ## How It Works
 
 1. **Keyword Processing**: Intelligently extracts and validates the keyword from various input formats
-2. **Auto-Translation**: Automatically translates non-English keywords to English using MyMemory Translation API (free service)
+2. **Dual Translation System**: 
+   - First tries MyMemory Translation API (more lenient matching)
+   - Falls back to LibreTranslate if MyMemory is unavailable
+   - Only uses translation if result differs from original term
 3. **Smart Search**: Performs fuzzy search on Wikipedia to find the best matching article (handles case variations, translations, and close matches)
 4. **Wikidata Integration**: Uses Wikidata to find English equivalents for foreign language terms
 5. **Main Image Extraction**: Retrieves the article's main/featured image with full attribution
@@ -198,8 +203,11 @@ The `window.function` async function handles:
 
 ## Notes
 
+- **Dual Translation System**: Uses two translation APIs for maximum reliability:
+  - Primary: MyMemory Translation API (free, no API key)
+  - Fallback: LibreTranslate (open source, free)
 - **Auto-Translation**: Keywords in any language are automatically translated to English for better Wikipedia search results
-- Uses MyMemory Translation API (free service, no API key required) for automatic translation
+- **Improved Success Rate**: Removed overly strict translation matching - now accepts all valid translations
 - Uses fuzzy search and Wikidata to match keywords even with case differences (e.g., "hamster" matches "Hamster" article)
 - The main Wikipedia page image is fetched first with complete attribution data
 - Additional quality images are sourced from Wikimedia Commons using the English page title (limited to 5 for performance)
@@ -211,4 +219,4 @@ The `window.function` async function handles:
 - Always provide valid developer credentials (name and email) to comply with Wikipedia's API policy
 - The function uses CORS-enabled Wikipedia, Commons, and translation endpoints for client-side requests
 - License information follows Creative Commons and other standard formats (CC BY, CC BY-SA, PD, etc.)
-- If translation API is unavailable, the system falls back to using the original keyword
+- If both translation APIs are unavailable, the system falls back to using the original keyword

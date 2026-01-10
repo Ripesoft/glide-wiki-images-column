@@ -42,11 +42,12 @@ function calculateSimilarity(str1, str2) {
 
 // Try to translate or find English equivalent
 async function findBestMatch(searchTerm, userName, userEmail) {
-  // Step 0: Try auto-translation to English first
+  // Step 0: Try auto-translation to English first with multiple methods
   let translatedTerm = null;
+  let translationMethod = null;
   
+  // Method 1: Try MyMemory Translation API
   try {
-    // Use MyMemory Translation API (free, no API key needed)
     const translateUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(searchTerm)}&langpair=auto|en`;
     
     const translateResponse = await fetch(translateUrl);
@@ -58,19 +59,48 @@ async function findBestMatch(searchTerm, userName, userEmail) {
       if (translateData.responseStatus === 200 && translateData.responseData?.translatedText) {
         const translated = translateData.responseData.translatedText.trim();
         
-        // Only use translation if it's different from original
-        // and the match score indicates it wasn't already English
+        // Use translation if it's different from original (more lenient check)
         if (translated && 
-            translated.toLowerCase() !== searchTerm.toLowerCase() &&
-            translateData.responseData.match < 0.99) {
+            translated.toLowerCase() !== searchTerm.toLowerCase()) {
           translatedTerm = translated;
-          console.log(`Auto-translated "${searchTerm}" to "${translatedTerm}"`);
+          translationMethod = 'MyMemory API';
+          console.log(`Auto-translated "${searchTerm}" to "${translatedTerm}" (confidence: ${translateData.responseData.match})`);
         }
       }
     }
   } catch (translateError) {
-    // If translation fails, continue without it
-    console.log('Translation API unavailable, using original term:', translateError);
+    console.log('MyMemory Translation API unavailable:', translateError.message);
+  }
+  
+  // Method 2: If no translation yet, try LibreTranslate (free, open source)
+  if (!translatedTerm) {
+    try {
+      const libreUrl = `https://libretranslate.com/translate`;
+      const libreResponse = await fetch(libreUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          q: searchTerm,
+          source: 'auto',
+          target: 'en',
+          format: 'text'
+        })
+      });
+      
+      if (libreResponse.ok) {
+        const libreData = await libreResponse.json();
+        if (libreData.translatedText && 
+            libreData.translatedText.toLowerCase() !== searchTerm.toLowerCase()) {
+          translatedTerm = libreData.translatedText.trim();
+          translationMethod = 'LibreTranslate';
+          console.log(`Auto-translated "${searchTerm}" to "${translatedTerm}" via LibreTranslate`);
+        }
+      }
+    } catch (libreError) {
+      console.log('LibreTranslate unavailable:', libreError.message);
+    }
   }
   
   // Step 1: Try direct Wikipedia search with multiple strategies
@@ -180,6 +210,7 @@ async function findBestMatch(searchTerm, userName, userEmail) {
   return {
     results: uniqueResults,
     translatedTerm: translatedTerm,
+    translationMethod: translationMethod,
     searchTermsUsed: searches
   };
 }
@@ -217,6 +248,7 @@ window.function = async function (keyword, userName, userEmail) {
         queriedKeywords: {
           original: searchTerm,
           translated: searchData.translatedTerm,
+          translationMethod: searchData.translationMethod,
           searchTermsUsed: searchData.searchTermsUsed
         },
         images: []
@@ -258,6 +290,7 @@ window.function = async function (keyword, userName, userEmail) {
         queriedKeywords: {
           original: searchTerm,
           translated: searchData.translatedTerm,
+          translationMethod: searchData.translationMethod,
           searchTermsUsed: searchData.searchTermsUsed
         },
         images: []
@@ -407,6 +440,7 @@ window.function = async function (keyword, userName, userEmail) {
       queriedKeywords: {
         original: searchTerm,
         translated: searchData.translatedTerm,
+        translationMethod: searchData.translationMethod,
         searchTermsUsed: searchData.searchTermsUsed
       },
       pageTitle: pageTitle,
