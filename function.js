@@ -1,5 +1,152 @@
 const functions = new Map();
 
+// Levenshtein distance for fuzzy matching
+function levenshteinDistance(a, b) {
+  const matrix = [];
+  
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  
+  return matrix[b.length][a.length];
+}
+
+// Calculate similarity score (0-1, where 1 is exact match)
+function calculateSimilarity(str1, str2) {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) return 1.0;
+  
+  const distance = levenshteinDistance(longer.toLowerCase(), shorter.toLowerCase());
+  return (longer.length - distance) / longer.length;
+}
+
+// Try to translate or find English equivalent
+async function findBestMatch(searchTerm, userName, userEmail) {
+  // Step 1: Try direct Wikipedia search with multiple strategies
+  const searches = [
+    // Direct search
+    searchTerm,
+    // Try with quotes for exact phrase
+    `"${searchTerm}"`,
+    // Capitalize first letter (common for proper nouns)
+    searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1).toLowerCase()
+  ];
+  
+  let bestResults = [];
+  
+  for (const query of searches) {
+    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=10&origin=*`;
+    
+    try {
+      const response = await fetch(searchUrl, {
+        headers: {
+          'User-Agent': `${userName} (${userEmail})`,
+          'Api-User-Agent': `${userName} (${userEmail})`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.query?.search && data.query.search.length > 0) {
+          bestResults = bestResults.concat(data.query.search);
+        }
+      }
+    } catch (err) {
+      console.error(`Search failed for ${query}:`, err);
+    }
+  }
+  
+  // Step 2: Try Wikidata to find English equivalent
+  // This helps with translations like "Pies" (Polish) -> "Dog" (English)
+  try {
+    const wikidataUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(searchTerm)}&language=en&format=json&limit=5&origin=*`;
+    
+    const wikidataResponse = await fetch(wikidataUrl, {
+      headers: {
+        'User-Agent': `${userName} (${userEmail})`,
+        'Api-User-Agent': `${userName} (${userEmail})`
+      }
+    });
+    
+    if (wikidataResponse.ok) {
+      const wikidataData = await wikidataResponse.json();
+      
+      if (wikidataData.search && wikidataData.search.length > 0) {
+        // Get the English label from Wikidata
+        const wikidataItem = wikidataData.search[0];
+        const englishLabel = wikidataItem.label;
+        const description = wikidataItem.description;
+        
+        // Search Wikipedia with the English label
+        if (englishLabel && englishLabel.toLowerCase() !== searchTerm.toLowerCase()) {
+          const englishSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(englishLabel)}&format=json&srlimit=10&origin=*`;
+          
+          const englishResponse = await fetch(englishSearchUrl, {
+            headers: {
+              'User-Agent': `${userName} (${userEmail})`,
+              'Api-User-Agent': `${userName} (${userEmail})`
+            }
+          });
+          
+          if (englishResponse.ok) {
+            const englishData = await englishResponse.json();
+            if (englishData.query?.search && englishData.query.search.length > 0) {
+              // Prioritize these results
+              bestResults = englishData.query.search.concat(bestResults);
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Wikidata search failed:', err);
+  }
+  
+  // Remove duplicates and rank by similarity
+  const uniqueResults = [];
+  const seen = new Set();
+  
+  for (const result of bestResults) {
+    if (!seen.has(result.title)) {
+      seen.add(result.title);
+      
+      // Calculate relevance score
+      const titleSimilarity = calculateSimilarity(searchTerm, result.title);
+      const snippetMatch = result.snippet?.toLowerCase().includes(searchTerm.toLowerCase()) ? 0.2 : 0;
+      
+      uniqueResults.push({
+        ...result,
+        relevanceScore: titleSimilarity + snippetMatch
+      });
+    }
+  }
+  
+  // Sort by relevance score
+  uniqueResults.sort((a, b) => b.relevanceScore - a.relevanceScore);
+  
+  return uniqueResults;
+}
+
 window.function = async function (keyword, userName, userEmail) {
   // Extract the actual keyword value - try multiple approaches
   let searchTerm = keyword;
@@ -22,28 +169,11 @@ window.function = async function (keyword, userName, userEmail) {
   }
   
   try {
-    // Step 1: Search for the page to handle case-insensitive and fuzzy matches
-    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(searchTerm)}&format=json&origin=*`;
-    
-    const searchResponse = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': `${userName} (${userEmail})`,
-        'Api-User-Agent': `${userName} (${userEmail})`
-      }
-    });
-    
-    if (!searchResponse.ok) {
-      return JSON.stringify({
-        error: `Wikipedia API error: ${searchResponse.status}`,
-        keyword: searchTerm,
-        images: []
-      });
-    }
-    
-    const searchData = await searchResponse.json();
+    // Step 1: Use improved search with fuzzy matching and translation support
+    const searchResults = await findBestMatch(searchTerm, userName, userEmail);
     
     // Get the best match from search results
-    if (!searchData.query?.search || searchData.query.search.length === 0) {
+    if (!searchResults || searchResults.length === 0) {
       return JSON.stringify({
         error: `No Wikipedia articles found for keyword: ${searchTerm}`,
         keyword: searchTerm,
@@ -51,7 +181,8 @@ window.function = async function (keyword, userName, userEmail) {
       });
     }
     
-    const pageTitle = searchData.query.search[0].title;
+    const pageTitle = searchResults[0].title;
+    const relevanceScore = searchResults[0].relevanceScore;
     
     // Step 2: Fetch page with main image only (using pageimages)
     const url = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles=${encodeURIComponent(pageTitle)}&origin=*`;
@@ -226,6 +357,11 @@ window.function = async function (keyword, userName, userEmail) {
     return JSON.stringify({
       keyword: searchTerm,
       pageTitle: pageTitle,
+      relevanceScore: Math.round(relevanceScore * 100) / 100,
+      alternativeMatches: searchResults.slice(1, 4).map(r => ({
+        title: r.title,
+        score: Math.round(r.relevanceScore * 100) / 100
+      })),
       images: imageUrls,
       imageCount: imageUrls.length,
       error: imageUrls.length === 0 ? 'No images found for this keyword' : null
